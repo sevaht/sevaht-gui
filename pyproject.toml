@@ -1,0 +1,146 @@
+[build-system]
+requires = ["hatchling (>=1.29.0,<2.0.0)", "hatch-vcs (>=0.5.0,<1.0.0)"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sevaht-gui"
+dynamic = ["version"]
+description = "Cross-platform tray icons and a tkinter app base for small GUIs."
+authors = [
+    {name = "Jacob McIntosh", email = "nacitar.sevaht@gmail.com"}
+]
+readme = "README.md"
+license = "Unlicense"
+requires-python = ">=3.12"
+keywords = [
+    "tray", "system-tray", "status-icon", "tkinter", "gui", "pystray",
+    "statusnotifieritem", "xembed",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Desktop Environment",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+dependencies = [
+    "Pillow>=12.2.0",
+    # Notifications (notify-send/dbus-send/console) live in sevaht-utility so
+    # they need no GUI/D-Bus library.
+    "sevaht-utility>=1.0.0",
+    # Windows uses pystray; Linux uses the StatusNotifierItem (dbus-next)
+    # backend, falling back to a self-contained XEmbed icon (python-xlib) on
+    # bare X11 window managers with no SNI host. macOS is intentionally
+    # unsupported: a real menu-bar item there needs a single main-thread Cocoa
+    # loop shared with tk (custom PyObjC), which the threaded model here cannot
+    # provide.
+    "pystray>=0.19.5; sys_platform == 'win32'",
+    "dbus-next>=0.2.3; sys_platform == 'linux'",
+    "python-xlib>=0.33; sys_platform == 'linux'",
+]
+
+[dependency-groups]
+dev = [
+    "black (>=26.3.1,<27.0.0)",
+    "build (>=1.4.2,<2.0.0)",
+    "mypy (>=1.20.0,<2.0.0)",
+    "pytest (>=9.0.2,<10.0.0)",
+    "ruff (>=0.15.8,<0.16.0)",
+    "twine (>=6.2.0,<7.0.0)",
+    "vulture (>=2.14,<3.0.0)",
+]
+docs = [
+    "sphinx (>=8.1.0,<9.0.0)",
+    "furo (>=2024.8.6)",
+    "myst-parser (>=4.0.0,<5.0.0)",
+]
+
+[project.urls]
+Homepage = "https://github.com/sevaht/sevaht-gui"
+Documentation = "https://sevaht.github.io/sevaht-gui/"
+Source = "https://github.com/sevaht/sevaht-gui"
+Issues = "https://github.com/sevaht/sevaht-gui/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+# Allow building before any tags/commits exist (fresh repo, or a source tree
+# with no .git): hatch-vcs/setuptools-scm falls back to this instead of erroring.
+# Real tags/commits override it, so this only matters pre-history.
+[tool.hatch.version.raw-options]
+fallback_version = "0.0.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sevaht_gui"]
+
+[tool.hatch.build.targets.sdist]
+# Allowlist so dev/local files (.claude, checks, publish-test.sh, .github, ...)
+# never leak into a published sdist. pyproject.toml/PKG-INFO/README/.gitignore
+# are force-included by hatchling regardless.
+include = ["/src", "/tests", "/LICENSE"]
+
+[tool.black]
+line-length = 79
+skip-magic-trailing-comma = true
+
+[tool.mypy]
+strict = true
+mypy_path = ["typings"]
+exclude = ["^docs/", "^dist/"]
+
+# The SNI backend annotates D-Bus methods with the bus type-signature strings
+# the dbus-next decorators require (e.g. ``x: "i"``); these are not Python
+# types, so type-checking the module is not meaningful.
+[[tool.mypy.overrides]]
+module = "sevaht_gui._tray_sni"
+ignore_errors = true
+
+# pystray is a Windows-only dependency (not installed on Linux, where the
+# linters run) and ships no type stubs.
+[[tool.mypy.overrides]]
+module = "pystray"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 79
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+extend-ignore = ["COM812", "COM819", "E203", "E501", "TD003"]
+select = [
+    "A", "ANN", "ARG", "ASYNC", "B", "BLE", "C4", "C90", "COM",
+    "DTZ", "E", "EM", "ERA", "F", "FA", "FLY", "FURB", "I",
+    "ISC", "LOG", "N", "PERF", "PGH", "PIE", "PLR", "PLW", "PTH",
+    "Q", "RET", "RSE", "RUF", "S", "SIM", "TC", "TCH", "TD",
+    "TID", "TRY", "UP"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"checks" = ["S603"]
+"tests/**/*" = ["PLR2004", "S101"]
+"**/_tray_sni.py" = [
+    "ANN201", "ANN202", "ARG002", "F722", "F821", "N802", "PLR0913", "UP037"
+]
+"typings/Xlib/**/*.pyi" = ["ANN401", "A002", "N818"]
+
+[tool.vulture]
+# This is a library: public API surface looks "unused" to vulture since
+# nothing in-repo calls it, which is the false positive vulture's own docs
+# tell you to address by raising min_confidence rather than whitelisting.
+min_confidence = 70
+# The SNI backend implements a D-Bus protocol: its interface methods are
+# invoked over the bus (never from Python) and carry spec-mandated, unused
+# arguments (x, y, ...). vulture matches identifiers by name across the whole
+# tree, so these only look unused in a codebase this small; skip the file, as
+# it is already exempted from mypy for the same protocol-shaped reasons.
+exclude = ["*_tray_sni.py"]
