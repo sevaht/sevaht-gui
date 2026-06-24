@@ -33,6 +33,9 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v8.2.0
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y python3-tk
+
       - name: Build HTML docs
         run: >-
           uv run --group docs sphinx-build -W --keep-going
