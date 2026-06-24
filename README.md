@@ -3,6 +3,20 @@
 Small cross-platform GUI building blocks: a system-tray icon and a tkinter
 application base, shared across Sevaht desktop tools.
 
+## Documentation
+
+Full documentation lives in `docs/` and is published to GitHub Pages:
+<https://sevaht.github.io/sevaht-gui/>.
+
+### Building the docs locally
+
+```console
+$ uv run --group docs sphinx-build -b html docs docs/_build/html
+```
+
+Then open `docs/_build/html/index.html`. (Publishing to GitHub Pages requires
+enabling Pages with the "GitHub Actions" source in the repository settings.)
+
 ## Tray icon
 
 `create_tray_icon` returns a single `TrayIcon` interface backed by the right
@@ -56,17 +70,3 @@ app.run(icon, start_hidden=True)  # only the tray shows until activated
 
 The library manages the tray lifecycle, window visibility, and threading;
 choosing and (re)drawing the artwork is left to the application.
-
-## Documentation
-
-Full documentation lives in `docs/` and is published to GitHub Pages:
-<https://sevaht.github.io/sevaht-gui/>.
-
-### Building the docs locally
-
-```console
-$ uv run --group docs sphinx-build -b html docs docs/_build/html
-```
-
-Then open `docs/_build/html/index.html`. (Publishing to GitHub Pages requires
-enabling Pages with the "GitHub Actions" source in the repository settings.)
