@@ -120,6 +120,7 @@ class StatusNotifierItemInterface(ServiceInterface):
         self._menu_path = menu_path
         self._on_activate: Callable[[], None] | None = None
         self._on_secondary: Callable[[], None] | None = None
+        self._on_activation_token: Callable[[str], None] | None = None
 
     def update_icon(self, icon_pixmap: list) -> None:
         # Only signal on an actual change; the tray syncs state periodically
@@ -150,6 +151,14 @@ class StatusNotifierItemInterface(ServiceInterface):
 
     def _tooltip_text(self) -> str:
         return self._title if self._tooltip is None else self._tooltip
+
+    @dbus_method()
+    def ProvideXdgActivationToken(self, token: "s"):
+        # The host's xdg-activation token for the click it is about to pass on
+        # (Activate, or an entry of the menu): what lets the window be raised
+        # and focused as the user's doing, not a window taking focus itself.
+        if self._on_activation_token and token:
+            self._on_activation_token(token)
 
     @dbus_method()
     def Activate(self, x: "i", y: "i"):
@@ -332,6 +341,7 @@ class SNITrayIcon:
         *,
         on_activate: Callable[[], None] | None = None,
         on_secondary: Callable[[], None] | None = None,
+        on_activation_token: Callable[[str], None] | None = None,
         on_quit: Callable[[], None] | None = None,
         activate_label: str = "Open",
         quit_label: str = "Quit",
@@ -343,6 +353,7 @@ class SNITrayIcon:
         self._render_icon = as_renderer(icon)
         self._on_activate = on_activate
         self._on_secondary = on_secondary
+        self._on_activation_token = on_activation_token
         self._on_quit = on_quit
         self._activate_label = activate_label
         self._quit_label = quit_label
@@ -485,6 +496,7 @@ class SNITrayIcon:
         )
         self._sni._on_activate = self._on_activate
         self._sni._on_secondary = self._on_secondary
+        self._sni._on_activation_token = self._on_activation_token
         self._bus.export(SNI_OBJECT_PATH, self._sni)
 
         if not await self._register_with_watcher():

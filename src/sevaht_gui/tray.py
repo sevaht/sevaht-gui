@@ -237,10 +237,12 @@ class _LinuxTrayIcon:
         activate_label: str,
         quit_label: str,
         tooltip: str | None = None,
+        on_activation_token: Callable[[str], None] | None = None,
     ) -> None:
         self._name = name
         self._title = title
         self._tooltip = tooltip
+        self._on_activation_token = on_activation_token
         # Normalize once up front: a file source is then read a single time,
         # even if we later rebuild on the XEmbed backend after an SNI failure.
         self._render_icon = as_renderer(icon)
@@ -261,6 +263,7 @@ class _LinuxTrayIcon:
                     self._render_icon,
                     on_activate=self._on_activate,
                     on_secondary=self._on_activate,
+                    on_activation_token=self._on_activation_token,
                     on_quit=self._on_quit,
                     activate_label=self._activate_label,
                     quit_label=self._quit_label,
@@ -329,6 +332,7 @@ def create_tray_icon(  # noqa: PLR0913
     activate_label: str = "Open",
     quit_label: str = "Quit",
     tooltip: str | None = None,
+    on_activation_token: Callable[[str], None] | None = None,
 ) -> TrayIcon:
     """Create the platform-appropriate tray icon behind :class:`TrayIcon`.
 
@@ -342,6 +346,11 @@ def create_tray_icon(  # noqa: PLR0913
     ``on_activate`` is the default action (left-click / default menu item) and
     ``on_quit`` is the quit action; either may be omitted. ``activate_label`` /
     ``quit_label`` are the menu labels used by backends that show a menu.
+    ``on_activation_token`` receives the xdg-activation token the tray host
+    gives (StatusNotifierItem's ``ProvideXdgActivationToken``) just before it
+    activates the item or one of its menu entries, which proves the user did
+    it: use it to raise and focus a window on ``on_activate`` (``TkApp`` does).
+    Called from the tray's thread.
     """
     if sys.platform == "win32":
         return _PystrayIcon(
@@ -363,4 +372,5 @@ def create_tray_icon(  # noqa: PLR0913
         activate_label=activate_label,
         quit_label=quit_label,
         tooltip=tooltip,
+        on_activation_token=on_activation_token,
     )

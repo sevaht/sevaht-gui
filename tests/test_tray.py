@@ -106,3 +106,13 @@ def test_sni_title_change_updates_a_derived_tooltip() -> None:
     assert signals == ["title", "tooltip"]
     item.update_tooltip(None)  # still derived: nothing changes
     assert signals == ["title", "tooltip"]
+
+
+def test_sni_item_passes_the_activation_token_on() -> None:
+    item = _sni_item("Name")
+    tokens: list[str] = []
+    item.ProvideXdgActivationToken("tok-1")  # nobody listening: fine
+    item._on_activation_token = tokens.append
+    item.ProvideXdgActivationToken("tok-2")
+    item.ProvideXdgActivationToken("")  # nothing to pass on
+    assert tokens == ["tok-2"]

@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from sevaht_utility.notifications import notify as _notify
 
+from ._x11 import request_activation
 from .fonts import DEFAULT_FONT_FAMILIES, apply_default_font, warn_if_no_xft
 from .monitors import primary_monitor_bounds as _primary_monitor_bounds
 from .theme import DEFAULT_THEME, apply_theme
@@ -147,6 +148,9 @@ class TkApp:
         # them all.
         self._icon_targets: list[tk.Tk | tk.Toplevel] = [self.root]
         self._tray: TrayIcon | None = None
+        # The tray host's xdg-activation token of the click that is about to
+        # show the window (set from the tray's thread, used by show()).
+        self._activation_token: str | None = None
         # Name used for the standalone notification fallback; captured from
         # create_tray_icon so app.notify works even when no tray is created.
         self._app_name: str | None = None
@@ -331,6 +335,7 @@ class TkApp:
             activate_label=activate_label,
             quit_label=quit_label,
             tooltip=tooltip,
+            on_activation_token=self._set_activation_token,
         )
         return self._tray
 
@@ -533,6 +538,9 @@ class TkApp:
         else:
             tray_icon.run(lambda _icon: tray_setup())
 
+    def _set_activation_token(self, token: str) -> None:
+        self._activation_token = token
+
     def show(self) -> None:
         """Show and raise the main window. Safe to call from any thread."""
         self.run_on_ui_thread(self._show)
@@ -546,6 +554,12 @@ class TkApp:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
+            # What the above cannot do on its own where a compositor or a
+            # window manager guards the focus (XWayland, fluxland...): ask
+            # it, as GTK and Qt do when they present a window
+            token, self._activation_token = self._activation_token, None
+            if str(self.root.tk.call("tk", "windowingsystem")) == "x11":
+                request_activation(self.root.winfo_id(), token)
 
     def hide(self) -> None:
         """Hide (withdraw) the main window. Safe to call from any thread."""
