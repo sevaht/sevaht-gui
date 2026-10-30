@@ -42,5 +42,6 @@ reference/tkapp
 reference/tray
 reference/widgets
 reference/theme
+reference/fonts
 reference/monitors
 ```

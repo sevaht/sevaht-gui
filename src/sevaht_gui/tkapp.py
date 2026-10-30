@@ -26,13 +26,14 @@ from typing import TYPE_CHECKING, Any
 
 from sevaht_utility.notifications import notify as _notify
 
+from .fonts import DEFAULT_FONT_FAMILIES, apply_default_font, warn_if_no_xft
 from .monitors import primary_monitor_bounds as _primary_monitor_bounds
 from .theme import DEFAULT_THEME, apply_theme
 from .tray import as_renderer, tray_available
 from .tray import create_tray_icon as _create_tray_icon
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from PIL import Image
 
@@ -91,6 +92,10 @@ class TkApp:
     Sensible defaults (each overridable via the constructor / method args):
 
     * a ttk theme with proper checkbox indicators;
+    * on X11, text in the first installed of ``font_families`` (Noto Sans,
+      DejaVu Sans...; ``None`` leaves Tk's fonts alone), and a logged warning
+      when this Python's Tk has no Xft and so cannot use the system's fonts
+      at all (see :mod:`sevaht_gui.fonts`);
     * the window is centered on the primary monitor the first time it is shown
       (``center_on_show``), then re-opens where it was last positioned;
     * :meth:`quit` asks for confirmation (``quit_confirm``);
@@ -110,6 +115,7 @@ class TkApp:
         self,
         *,
         theme: str | None = DEFAULT_THEME,
+        font_families: Sequence[str] | None = DEFAULT_FONT_FAMILIES,
         checkmark_indicator: bool = True,
         quit_confirm: str | None = DEFAULT_QUIT_CONFIRM,
         quit_confirm_title: str = "Quit",
@@ -118,6 +124,10 @@ class TkApp:
         poll_interval_ms: int = _DEFAULT_POLL_INTERVAL_MS,
     ) -> None:
         self.root = tk.Tk()
+        # A Tk with no Xft cannot use the system's fonts: say so once
+        warn_if_no_xft(self.root)
+        if font_families is not None:
+            apply_default_font(self.root, font_families)
         if theme is not None:
             apply_theme(theme, checkmark_indicator=checkmark_indicator)
         self._poll_interval_ms = poll_interval_ms

@@ -34,13 +34,37 @@ right-click; the menu-less XEmbed backend maps right-click straight to quit.
 
 The icon is any **`IconSource`** — a prepared `PIL.Image`, a path to an image
 file (both static; the common case), or a renderer `Callable[[int], Image]`
-for apps that draw their own artwork. The tooltip and the icon can be changed
+for apps that draw their own artwork. The title (the item's name) and the optional
+`tooltip` (the text shown on hover, apart from the title) and the icon can be changed
 live (`set_icon` accepts any `IconSource`), so an app can reflect state either
 by swapping prepared images or by re-rendering.
 
 macOS is intentionally unsupported: a real menu-bar item there needs a single
 main-thread Cocoa loop shared with tk (custom PyObjC), which the threaded model
 used here cannot provide.
+
+## Fonts on Linux: use a Python whose Tk has Xft
+
+On X11 (and Wayland through XWayland) Tk draws the system's fonts only if it was
+built with **Xft**. Every distribution's Python has that. The Python builds that
+`uv` downloads (python-build-standalone) do **not**: their Tk was built with
+`--disable-xft` and can only use the legacy X core fonts, which a modern
+desktop barely has, so every font falls back to the X server's `fixed` and the
+window looks wrong whatever font you ask for. Nothing at run time can change
+that. `TkApp` logs a warning when it sees such a Tk; on Windows and macOS this
+does not apply.
+
+Run on your distribution's Python instead, for example:
+
+```sh
+uv tool install --python /usr/bin/python3 <your-app>   # or: pipx install <your-app>
+uv python pin /usr/bin/python3                          # in a project
+```
+
+or tell uv to only use system interpreters (`python-preference = "only-system"`
+in `~/.config/uv/uv.toml`). With Xft, `TkApp` also uses the first installed of
+Noto Sans, DejaVu Sans, Liberation Sans and Cantarell for Tk's text fonts
+(`font_families=`; `None` keeps Tk's own choice).
 
 ## TkApp
 
