@@ -70,6 +70,7 @@ Issues = "https://github.com/sevaht/sevaht-gui/issues"
 
 [tool.hatch.version]
 source = "vcs"
+fallback-version = "0.0.0.dev0"
 
 # Allow building before any tags/commits exist (fresh repo, or a source tree
 # with no .git): hatch-vcs/setuptools-scm falls back to this instead of erroring.

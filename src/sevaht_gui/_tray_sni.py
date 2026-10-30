@@ -105,12 +105,18 @@ def _render_pixmaps(render_icon: "Callable[[int], Image.Image]") -> list[list]:
 
 class StatusNotifierItemInterface(ServiceInterface):
     def __init__(
-        self, app_id: str, icon_pixmap: list, title: str, menu_path: str
+        self,
+        app_id: str,
+        icon_pixmap: list,
+        title: str,
+        menu_path: str,
+        tooltip: str | None = None,
     ) -> None:
         super().__init__("org.kde.StatusNotifierItem")
         self._app_id = app_id
         self._icon_pixmap = icon_pixmap
         self._title = title
+        self._tooltip = tooltip
         self._menu_path = menu_path
         self._on_activate: Callable[[], None] | None = None
         self._on_secondary: Callable[[], None] | None = None
@@ -128,9 +134,22 @@ class StatusNotifierItemInterface(ServiceInterface):
             return
         self._title = title
         self.NewTitle()
-        # The tooltip text is derived from the title; hosts cache the ToolTip
-        # property and only re-read it when NewToolTip fires.
-        self.NewToolTip()
+        # Without a tooltip of its own the tooltip text is derived from the
+        # title; hosts cache the ToolTip property and only re-read it when
+        # NewToolTip fires.
+        if self._tooltip is None:
+            self.NewToolTip()
+
+    def update_tooltip(self, tooltip: str | None) -> None:
+        if tooltip == self._tooltip:
+            return
+        derived_before = self._tooltip_text()
+        self._tooltip = tooltip
+        if self._tooltip_text() != derived_before:
+            self.NewToolTip()
+
+    def _tooltip_text(self) -> str:
+        return self._title if self._tooltip is None else self._tooltip
 
     @dbus_method()
     def Activate(self, x: "i", y: "i"):
@@ -156,8 +175,9 @@ class StatusNotifierItemInterface(ServiceInterface):
 
     @dbus_property(access=PropertyAccess.READ)
     def Title(self) -> "s":
-        # Keep the item Title to a single line; multiline belongs in the
-        # tooltip description (see ToolTip).
+        # Keep the item Title to a single line (a name: hosts show it in the
+        # item's menu); multiline belongs in the tooltip description (see
+        # ToolTip).
         return self._title.partition("\n")[0]
 
     @dbus_property(access=PropertyAccess.READ)
@@ -213,10 +233,10 @@ class StatusNotifierItemInterface(ServiceInterface):
 
     @dbus_property(access=PropertyAccess.READ)
     def ToolTip(self) -> "(sa(iiay)ss)":
-        # (icon name, icon pixmap, title, description). A multiline title is
-        # split so the first line is the tooltip header and the rest is the
-        # body, which hosts render as multiple lines.
-        head, _, body = self._title.partition("\n")
+        # (icon name, icon pixmap, title, description). The tooltip (the
+        # title when none was given) is split so the first line is the header
+        # and the rest is the body, which hosts render as multiple lines.
+        head, _, body = self._tooltip_text().partition("\n")
         return ["", [], head, body]
 
     @dbus_signal()
@@ -315,9 +335,11 @@ class SNITrayIcon:
         on_quit: Callable[[], None] | None = None,
         activate_label: str = "Open",
         quit_label: str = "Quit",
+        tooltip: str | None = None,
     ) -> None:
         self._app_id = app_id
         self._title = title
+        self._tooltip = tooltip
         self._render_icon = as_renderer(icon)
         self._on_activate = on_activate
         self._on_secondary = on_secondary
@@ -342,6 +364,16 @@ class SNITrayIcon:
         self._title = value
         if self._sni is not None:
             self._sni.update_title(value)
+
+    @property
+    def tooltip(self) -> str | None:
+        return self._tooltip
+
+    @tooltip.setter
+    def tooltip(self, value: str | None) -> None:
+        self._tooltip = value
+        if self._sni is not None:
+            self._sni.update_tooltip(value)
 
     def set_icon(self, icon: "IconSource") -> None:
         self._render_icon = as_renderer(icon)
@@ -445,7 +477,11 @@ class SNITrayIcon:
         self._bus.export(DBUS_MENU_OBJECT_PATH, self._dbus_menu)
 
         self._sni = StatusNotifierItemInterface(
-            self._app_id, pixmap, self._title, DBUS_MENU_OBJECT_PATH
+            self._app_id,
+            pixmap,
+            self._title,
+            DBUS_MENU_OBJECT_PATH,
+            self._tooltip,
         )
         self._sni._on_activate = self._on_activate
         self._sni._on_secondary = self._on_secondary

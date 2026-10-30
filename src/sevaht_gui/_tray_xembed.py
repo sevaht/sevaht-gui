@@ -91,6 +91,7 @@ class XEmbedTrayIcon:
     ) -> None:
         self._name = name
         self._title = title
+        self._tooltip: str | None = None
         self._render_icon = as_renderer(icon)
         self._on_activate = on_activate
         self._on_quit = on_quit
@@ -118,6 +119,16 @@ class XEmbedTrayIcon:
         )
 
     # -- TrayIcon surface -------------------------------------------------
+
+    @property
+    def tooltip(self) -> str | None:
+        # An XEmbed icon has no tooltip of its own (the host shows the window
+        # name, the title), so this is only kept for the TrayIcon surface.
+        return self._tooltip
+
+    @tooltip.setter
+    def tooltip(self, value: str | None) -> None:
+        self._tooltip = value
 
     @property
     def title(self) -> str:

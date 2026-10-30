@@ -290,6 +290,7 @@ class TkApp:
         activate_label: str = "Open",
         quit_label: str = "Quit",
         window_icon: bool = True,
+        tooltip: str | None = None,
     ) -> TrayIcon | None:
         """Create a tray icon bound to this app, or ``None`` if no tray exists.
 
@@ -297,7 +298,9 @@ class TkApp:
         window close button then quits instead of hiding). ``on_activate``
         defaults to :meth:`show` and ``on_quit`` to :meth:`quit`. ``window_icon``
         (default) also sets the window's title-bar icon to ``icon`` so the two
-        match; pass ``False`` to manage the window icon separately. Pass the
+        match; pass ``False`` to manage the window icon separately. ``tooltip``
+        is what shows on hover when it should differ from ``title`` (the
+        name); change it later through the icon's ``tooltip``. Pass the
         result to :meth:`run`.
         """
         self._app_name = name
@@ -317,6 +320,7 @@ class TkApp:
             on_quit=on_quit if on_quit is not None else self.quit,
             activate_label=activate_label,
             quit_label=quit_label,
+            tooltip=tooltip,
         )
         return self._tray
 

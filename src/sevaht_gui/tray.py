@@ -111,6 +111,10 @@ class TrayIcon(Protocol):
     """The tray-icon surface the application relies on, regardless of backend."""
 
     title: str
+    # What shows on hover, when it is not the title (None: the title). The
+    # first line is the tooltip's header, the rest its body where the backend
+    # shows more than one line (SNI); the XEmbed backend has no tooltip.
+    tooltip: str | None
 
     def set_icon(self, icon: IconSource) -> None:
         """Replace the icon with any :data:`IconSource` (static or renderer)."""
@@ -144,8 +148,12 @@ class _PystrayIcon:
         on_quit: Callable[[], None] | None,
         activate_label: str,
         quit_label: str,
+        tooltip: str | None = None,
     ) -> None:
         import pystray
+
+        self._title = title
+        self._tooltip = tooltip
 
         items = []
         if on_activate is not None:
@@ -161,7 +169,7 @@ class _PystrayIcon:
         self._icon = pystray.Icon(
             name,
             icon=as_renderer(icon)(_PYSTRAY_ICON_SIZE),
-            title=title,
+            title=title if tooltip is None else tooltip,
             menu=pystray.Menu(*items),
         )
 
@@ -180,11 +188,22 @@ class _PystrayIcon:
 
     @property
     def title(self) -> str:
-        return str(self._icon.title)
+        return self._title
 
     @title.setter
     def title(self, value: str) -> None:
-        self._icon.title = value
+        self._title = value
+        self._icon.title = value if self._tooltip is None else self._tooltip
+
+    @property
+    def tooltip(self) -> str | None:
+        return self._tooltip
+
+    @tooltip.setter
+    def tooltip(self, value: str | None) -> None:
+        # pystray's one string is the hover text
+        self._tooltip = value
+        self._icon.title = self._title if value is None else value
 
     def run(self, setup: SetupCallback | None = None) -> None:
         def _setup(icon: object) -> None:
@@ -217,9 +236,11 @@ class _LinuxTrayIcon:
         on_quit: Callable[[], None] | None,
         activate_label: str,
         quit_label: str,
+        tooltip: str | None = None,
     ) -> None:
         self._name = name
         self._title = title
+        self._tooltip = tooltip
         # Normalize once up front: a file source is then read a single time,
         # even if we later rebuild on the XEmbed backend after an SNI failure.
         self._render_icon = as_renderer(icon)
@@ -243,6 +264,7 @@ class _LinuxTrayIcon:
                     on_quit=self._on_quit,
                     activate_label=self._activate_label,
                     quit_label=self._quit_label,
+                    tooltip=self._tooltip,
                 )
 
         from ._tray_xembed import XEmbedTrayIcon
@@ -273,6 +295,15 @@ class _LinuxTrayIcon:
         self._title = value
         self._backend.title = value
 
+    @property
+    def tooltip(self) -> str | None:
+        return self._tooltip
+
+    @tooltip.setter
+    def tooltip(self, value: str | None) -> None:
+        self._tooltip = value
+        self._backend.tooltip = value
+
     def run(self, setup: SetupCallback | None = None) -> None:
         try:
             self._backend.run(setup)
@@ -297,11 +328,15 @@ def create_tray_icon(  # noqa: PLR0913
     on_quit: Callable[[], None] | None = None,
     activate_label: str = "Open",
     quit_label: str = "Quit",
+    tooltip: str | None = None,
 ) -> TrayIcon:
     """Create the platform-appropriate tray icon behind :class:`TrayIcon`.
 
     ``name`` is a machine-friendly identifier (used for the SNI item id and the
-    XEmbed window class); ``title`` is the human-readable tooltip. ``icon`` is
+    XEmbed window class); ``title`` is the human-readable name, and also the
+    tooltip unless ``tooltip`` is given (a status shown on hover, its first
+    line the header; the title then stays the name hosts show in the item's
+    menu, as the StatusNotifierItem ``Title`` is). ``icon`` is
     any :data:`IconSource` -- a prepared PIL image, an image file path, or a
     renderer; swap it later with :meth:`TrayIcon.set_icon` to reflect state.
     ``on_activate`` is the default action (left-click / default menu item) and
@@ -317,6 +352,7 @@ def create_tray_icon(  # noqa: PLR0913
             on_quit=on_quit,
             activate_label=activate_label,
             quit_label=quit_label,
+            tooltip=tooltip,
         )
     return _LinuxTrayIcon(
         name,
@@ -326,4 +362,5 @@ def create_tray_icon(  # noqa: PLR0913
         on_quit=on_quit,
         activate_label=activate_label,
         quit_label=quit_label,
+        tooltip=tooltip,
     )
